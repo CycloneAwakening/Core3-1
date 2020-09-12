@@ -325,8 +325,13 @@ void DirectorManager::initializeLuaEngine(Lua* luaEngine) {
 		luaEngine->setLogLevel(Logger::INFO);
 	}
 
-	luaEngine->setFileLogger("log/lua.log", true);
+	luaEngine->setFileLogger("log/lua.log", true, ConfigManager::instance()->getRotateLogAtStart());
 	luaEngine->setLogJSON(ConfigManager::instance()->getLuaLogJSON());
+	luaEngine->setRotateLogSizeMB(ConfigManager::instance()->getRotateLogSizeMB());
+
+	if (luaEngine->getLogJSON()) {
+		luaEngine->setLogSynchronized(true);
+	}
 
 	setupLuaPackagePath(luaEngine);
 
@@ -699,7 +704,13 @@ int DirectorManager::createLoot(lua_State* L) {
 		return 0;
 
 	LootManager* lootManager = ServerCore::getZoneServer()->getLootManager();
-	lootManager->createLoot(container, lootGroup, level, maxCondition);
+	TransactionLog trx(TrxCode::LUASCRIPT, container);
+	trx.addContextFromLua(L);
+	if (lootManager->createLoot(trx,container, lootGroup, level, maxCondition)) {
+		trx.commit(true);
+	} else {
+		trx.abort() << __FUNCTION__ << " failed: lootGroup=" << lootGroup << "; level=" << level << "; maxCondition=" << maxCondition;
+	}
 
 	return 0;
 }
@@ -722,7 +733,13 @@ int DirectorManager::createLootSet(lua_State* L) {
 		return 0;
 
 	LootManager* lootManager = ServerCore::getZoneServer()->getLootManager();
-	lootManager->createLootSet(container, lootGroup, level, maxCondition, setSize);
+	TransactionLog trx(TrxCode::LUASCRIPT, container);
+	trx.addContextFromLua(L);
+	if (lootManager->createLootSet(trx, container, lootGroup, level, maxCondition, setSize)) {
+		trx.commit(true);
+	} else {
+		trx.abort() << __FUNCTION__ << " failed: lootGroup=" << lootGroup << "; level=" << level << "; maxCondition=" << maxCondition << "; setSize=" << setSize;
+	}
 
 	return 0;
 }
@@ -751,7 +768,13 @@ int DirectorManager::createLootFromCollection(lua_State* L) {
 	luaObject.pop();
 
 	LootManager* lootManager = ServerCore::getZoneServer()->getLootManager();
-	lootManager->createLootFromCollection(container, &lootCollection, level);
+	TransactionLog trx(TrxCode::LUASCRIPT, container);
+	trx.addContextFromLua(L);
+	if (lootManager->createLootFromCollection(trx, container, &lootCollection, level)) {
+		trx.commit(true);
+	} else {
+		trx.abort() << __FUNCTION__ << " failed: level=" << level;
+	}
 
 	return 0;
 }

@@ -25,6 +25,7 @@
 #include "templates/customization/CustomizationIdManager.h"
 #include "server/zone/managers/skill/imagedesign/ImageDesignManager.h"
 #include "server/zone/managers/jedi/JediManager.h"
+#include "server/zone/objects/transaction/TransactionLog.h"
 
 PlayerCreationManager::PlayerCreationManager() :
 		Logger("PlayerCreationManager") {
@@ -409,8 +410,16 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 	playerCreature->setClient(client);
 
 	// Set starting cash and starting bank
-	playerCreature->setCashCredits(startingCash, false);
-	playerCreature->setBankCredits(startingBank, false);
+	playerCreature->clearCashCredits(false);
+	playerCreature->clearBankCredits(false);
+	{
+		TransactionLog trx(TrxCode::CHARACTERCREATION, playerCreature, startingCash, true);
+		playerCreature->addCashCredits(startingCash, false);
+	}
+	{
+		TransactionLog trx(TrxCode::CHARACTERCREATION, playerCreature, startingBank, false);
+		playerCreature->addBankCredits(startingBank, false);
+	}
 
 	ManagedReference<PlayerObject*> ghost = playerCreature->getPlayerObject();
 
@@ -438,10 +447,6 @@ bool PlayerCreationManager::createCharacter(ClientCreateCharacterCallback* callb
 				&playerTemplate->getStartingSkills(),
 				&playerTemplate->getStartingItems(), true);
 	}
-
-	// Set starting cash and starting bank
-	playerCreature->setCashCredits(startingCash, false);
-	playerCreature->setBankCredits(startingBank, false);
 
 	if (ghost != nullptr) {
 		int accID = client->getAccountID();
